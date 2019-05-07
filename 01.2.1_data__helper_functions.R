@@ -63,7 +63,7 @@ get_days <- function(first_date = '20170101', most_recent_date = Sys.time(),day_
   
   ### IF MODIS
   if(data_type == "MOD14A2"){
-  full_data_path <- paste(full_data_path, "/2017/MOD14A2.csv", sep="")
+  full_data_path <- paste(full_data_path, "/2019/MOD14A2.csv", sep="")
   modis_current <- read.csv(full_data_path)
   modis_current <- as.matrix(modis_current)
   

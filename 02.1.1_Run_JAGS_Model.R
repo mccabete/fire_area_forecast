@@ -63,7 +63,7 @@ data$mu1<- 17125000 # MODIS mean burned area from Jan&Feb
 #data$v_0<- 10 
 #data$mod_1 <- 10
 #data$mod_2 <- 1
-data$sigmaIC <- 1/13314198
+data$sigmaIC <- 1000#1/13314198
 data$s_1 <- 1/13314198
 data$s_2 <- 1
 data$start_viirs <- 47
