@@ -15,17 +15,19 @@ ensemble_number <- 700
 ne <- ensemble_number
 X <- matrix(NA, nrow = ne, ncol =1)
 
+
 SSEM <- function(X,params,inputs, ensemble_number){ # X is previous step latent state
   mu <- matrix(NA, nrow = ensemble_number, ncol = 1)
-  X <- as.matrix(X)
+  #X <- as.matrix(X)
   beta_precip <- params$beta_precip
   beta_temp <- params$beta_temp
   beta_sigma <- params$sigma
   
   mu <- X[,1] + beta_precip*inputs[1] + beta_temp*inputs[2]#+beta_IC
-  N <- rnorm(ensemble_number, mu, beta_sigma)
+  print(mu)
+  N <- rnorm(ensemble_number, mu, abs(beta_sigma))
   
-  N[is.nan(N)] <- 999999999999 #put max value, assuming that it is giving infinity
+ #N[is.nan(N)] <- 999999999999 #put max value, assuming that it is giving infinity
   return(N)
 }
 
@@ -87,12 +89,14 @@ output = array(0.0,c(nt,ne,1))
 
 ## Foreward ensemble simulation
 nt <- length(modis_days)  #Number of steps we are forecasting
+X <- X.orig
 for(t in 1:nt){
   output[t,,] <- SSEM(X,params,inputs[t,], ne)
-  X <- output[t,,1]
-     ## counter: weeks elapsed
+  X <- as.matrix(output[t,,1])
+  print(t)
 }
 
+#output_na_omit <- output[!is.nan(output)]
 ## Plot Foreward ensemble sim
 par(mfrow=c(1,1))
 ci = apply(output[,,],1,quantile,c(0.025,0.5,0.975), na.rm = TRUE)
@@ -102,9 +106,10 @@ lines(ci[2,])
 
 
 ###### Non-resampling particle filter ######
-window <- rep(1, nt)
+#window <- rep(1, nt)
+window <- 1:7
 LAIm = t(apply(output[,,1],2,tapply,window,mean))
-LAIm <- t(LAIm)
+
 ##temporary <- as.matrix(output[,,1])
 #LAIm = tapply(output[,,1],2, INDEX = 1, FUN = mean)
 
@@ -119,7 +124,8 @@ for(i in 1:ne){
   LAIlike[i,] = dnorm(LAIm[i,],LAIr[sel],LAIr.sd[sel], log = TRUE)  ## calculate log likelihoods
   print(LAIlike[i,])
   #LAIlike[i,is.na(LAIlike[i,])] = 0       ## missing data as weight 1; log(1)=0
-  LAIlike[i,] = -cumsum(LAIlike[i,])  ## convert to cumulative likelihood (Had to remove exp due to Inf errors)
+  LAIlike[i,] <- LAIlike[i, ]
+  LAIlike[i,] = exp(cumsum(LAIlike[i,]))  ## convert to cumulative likelihood (Had to remove exp due to Inf errors)
 }
 hist(LAIlike[,ncol(LAIlike)],main="Final Ensemble Weights")
 
@@ -132,23 +138,15 @@ for(i in 1:nobs){
   LAIpf[,i] = wtd.quantile(LAIm[,i],LAIlike[,i]/wbar[i],c(0.025,0.5,0.975))  ## calculate weighted median and CI
 }
 
-## Non-resampling Particle Filter
-## calculation of CI
-nobs = ncol(LAIlike)                     ## number of observations
-LAIpf = matrix(NA,3,nobs)
-wbar = apply(LAIlike,2,mean)             ## mean weight at each time point
-for(i in 1:nobs){
-  LAIpf[,i] = wtd.quantile(LAIm[,i],LAIlike[,i]/wbar[i],c(0.025,0.5,0.975))  ## calculate weighted median and CI
-}
 
 
 
 ## plot original ensemble and PF with data
-Mtime <- modis_days
-Msel <- 1
+Mtime <- as.Date(modis_days)
+Msel <- 1:7
 col.pf   = c(col.alpha("lightGrey",0.5),col.alpha("lightBlue",0.5),col.alpha("lightGreen",0.5)) ## color sequence
 names.pf = c("ensemble","non-resamp PF","resamp PF")                         ## legend names
-plot(Mtime[Msel],LAIm.ci[2,],ylim=range(c(range(LAIm.ci),range(LAIr,na.rm=TRUE))),
+plot(Mtime[Msel],LAIm.ci[2,], ylim=range(c(range(LAIm.ci),range(LAIr,na.rm=TRUE))),
      type='n',ylab="Burn Area",xlab="Time")
 ciEnvelope(Mtime,LAIm.ci[1,],LAIm.ci[3,],col=col.pf[1])                ## original ensemble
 ciEnvelope(Mtime,LAIpf[1,],LAIpf[3,],col=col.pf[2])                    ## non-resampling Particle Filter
@@ -156,4 +154,4 @@ points(Mtime,LAIr)                                                           ## 
 for(i in 1:length(LAIr)){                                                    ## observation uncertainty
     lines(rep(Mtime[i],2),LAIr[i]+c(-1,1)*LAIr.sd[i])
 }
-legend("topleft",legend=names.pf[1:2],col=col.pf[1:2],lwd=5)
+legend("bottomright",legend=names.pf[1:2],col=col.pf[1:2],lwd=5)
